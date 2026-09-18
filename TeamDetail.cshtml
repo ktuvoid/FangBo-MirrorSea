@@ -1,0 +1,100 @@
+﻿@model MirrorSea.Models.TeamMember
+@{
+    ViewData["Title"] = Model.Name + " - 諮商團隊";
+}
+<div class="container py-5">
+    <div class="mb-4">
+        <a asp-action="Team" class="text-muted small">← 返回團隊列表</a>
+    </div>
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0" style="background-color:#F9F5F0;">
+                <div class="card-body p-4 p-md-5">
+                    <div class="d-flex align-items-center mb-4">
+                        @if (!string.IsNullOrEmpty(Model.PhotoUrl))
+                        {
+                            <img src="@Model.PhotoUrl"
+                                 alt="@Model.Name"
+                                 class="rounded-circle me-3"
+                                 style="width:90px;height:90px;object-fit:cover;border:3px solid #B7ADA0;" />
+                        }
+                        else
+                        {
+                            <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                                 style="width:90px;height:90px;background:#B7ADA0;color:white;font-size:1.8rem;">
+                                @Model.Initial
+                            </div>
+                        }
+                        <div>
+                            <h2 class="fw-bold mb-1" style="color:#1E1E1E;">@Model.Name</h2>
+                            <p class="text-muted mb-1">@Model.Title</p>
+
+                            @if (Model.IsFangboCounselor)
+                            {
+                                <span class="badge rounded-pill" style="background-color:#8C6E5A; color:white; font-size:0.8rem;">
+                                    方泊諮商所 諮商心理師
+                                </span>
+                            }
+                            @if (Model.IsFangboClinical)
+                            {
+                                <span class="badge rounded-pill" style="background-color:#5A6E8C;color:white; font-size:0.8rem;">
+                                    方泊諮商所 臨床心理師
+                                </span>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- 專業資格 -->
+                    <h5 class="mb-3" style="color:#8C6E5A;">專業資格</h5>
+                    <ul class="mb-4" style="line-height:1.8;">
+                        @if (Model.QualificationList.Any())
+                        {
+                            @foreach (var q in Model.QualificationList)
+                            {
+                                <li>@q</li>
+                            }
+                        }
+                        else
+                        {
+                            <li class="text-muted"></li>
+                        }
+                    </ul>
+
+                    <!-- 新增：專業經歷 -->
+                    <h5 class="mb-3" style="color:#8C6E5A;">專業經歷</h5>
+                    <ul class="mb-4" style="line-height:1.8;">
+                        @if (Model.ProfessionalExperienceList != null && Model.ProfessionalExperienceList.Any())
+                        {
+                            @foreach (var exp in Model.ProfessionalExperienceList)
+                            {
+                                <li>@exp</li>
+                            }
+                        }
+                        else
+                        {
+                            <li class="text-muted"></li>
+                        }
+                    </ul>
+
+                    <!-- 心理治療專長 -->
+                    <h5 class="mb-3" style="color:#8C6E5A;">心理治療專長</h5>
+                    <ul class="mb-4" style="line-height:1.8;">
+                        @if (Model.SpecialtyList.Any())
+                        {
+                            @foreach (var s in Model.SpecialtyList)
+                            {
+                                <li>@s</li>
+                            }
+                        }
+                        else
+                        {
+                            <li class="text-muted">尚未填寫</li>
+                        }
+                    </ul>
+
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

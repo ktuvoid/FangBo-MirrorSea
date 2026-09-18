@@ -1,0 +1,31 @@
+﻿@model MirrorSea.Models.Article
+@{
+    ViewData["Title"] = Model.Title;
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <a asp-action="Articles" class="btn btn-outline-secondary btn-sm mb-4">← 返回文章列表</a>
+
+            <article class="card border-0 shadow-sm" style="background-color:#F9F5F0;">
+                <div class="card-body p-4 p-md-5">
+                    <h1 class="fw-bold mb-3" style="color:#1E1E1E;">@Model.Title</h1>
+                    <div class="d-flex gap-3 text-muted small mb-4">
+                        <span>作者：@Model.AuthorName</span>
+                        <span>發布：@Model.PublishedAt?.ToString("yyyy年MM月dd日")</span>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(Model.CoverImageUrl))
+                    {
+                        <img src="@Model.CoverImageUrl" class="img-fluid rounded mb-4" alt="@Model.Title">
+                    }
+
+                    <div class="article-content" style="line-height:1.8; white-space:pre-wrap;">
+                        @Html.Raw(Model.Content.Replace("\n", "<br>"))
+                    </div>
+                </div>
+            </article>
+        </div>
+    </div>
+</div>

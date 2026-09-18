@@ -1,0 +1,887 @@
+﻿@{
+    ViewData["Title"] = "方泊 鏡海";
+}
+
+<div class="container-fluid p-0 drawing-page">
+    <div class="drawing-page">
+        <!-- 頂部工具列 -->
+        <div class="toolbar py-2 px-3 border-bottom d-flex align-items-center gap-2 flex-wrap">
+            <button class="btn btn-outline-dark tool-btn" onclick="selectMode('選擇')">選擇</button>
+            <button class="btn btn-outline-dark tool-btn" onclick="selectMode('筆刷')">筆刷</button>
+            <button class="btn btn-outline-dark tool-btn" onclick="selectMode('橡皮擦')">橡皮擦</button>
+            <button class="btn btn-danger tool-btn" onclick="clearAll()">清空</button>
+            <button class="btn btn-outline-primary tool-btn" onclick="undo()">撤銷</button>
+            <button class="btn btn-outline-primary tool-btn" onclick="redo()">重做</button>
+            <button class="btn btn-success tool-btn" onclick="saveAsPNG()">儲存 PNG</button>
+            <button class="btn btn-outline-dark tool-btn" onclick="toggleSidebar()">工具面板</button>
+            <div class="vr"></div>
+            <label class="color-label">輪廓</label>
+            <input type="color" id="strokeColorPicker" class="color-picker" onchange="applyStrokeColor(this.value)">
+            <label class="color-label">填充</label>
+            <input type="color" id="fillColorPicker" class="color-picker" onchange="applyFillColor(this.value)">
+        </div>
+
+        <!-- 畫布區域 -->
+        <div id="canvas-container">
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <!-- 右側水墨風可完全隱藏側邊欄 -->
+        <div id="sidebar" class="sidebar hidden">
+            <!-- 毛筆風格 Toggle 按鈕 -->
+            <div class="toggle-btn" onclick="toggleSidebar()" id="sidebarToggle" title="展開 / 隱藏 工具面板"></div>
+
+            <div class="sidebar-header">
+                <h5 class="sidebar-title">工具面板</h5>
+            </div>
+
+            <div class="sidebar-content">
+                <!-- 形狀工具 -->
+                <h6 class="mt-3">形狀工具</h6>
+                <div class="btn-group-vertical w-100">
+                    <button class="btn btn-light text-start" onclick="selectMode('直線')">─ 直線</button>
+                    <button class="btn btn-light text-start" onclick="selectMode('矩形')">□ 矩形</button>
+                    <button class="btn btn-light text-start" onclick="selectMode('圓形')">○ 圓形</button>
+                    <button class="btn btn-light text-start" onclick="selectMode('三角形')">△ 三角形</button>
+                    <button class="btn btn-light text-start" onclick="selectMode('星形')">★ 星形</button>
+                    <button class="btn btn-light text-start" onclick="selectMode('箭頭')">→ 箭頭</button>
+                    <button class="btn btn-light text-start" onclick="selectMode('文字')">T 文字</button>
+                </div>
+
+                <!-- 情緒標籤 -->
+                <h6 class="mt-4">情緒標籤</h6>
+                <div id="emojiGrid" class="d-flex flex-wrap gap-2 mb-2"></div>
+                <button class="btn btn-success w-100" onclick="addCustomEmoji()">＋ 添加新表情</button>
+
+                <!-- 粗細 -->
+                <h6 class="mt-4">粗細</h6>
+                <input type="range" class="form-range" min="1" max="50" value="5" oninput="setStrokeWidth(this.value)">
+
+                <!-- 物件屬性 -->
+                <h6 class="mt-4">物件屬性</h6>
+                <input type="text" id="txtText" class="form-control" onkeyup="updateText(this.value)" placeholder="修改選取文字...">
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .toolbar {
+        background: #FAF5FF;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+
+    .toolbar-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+        padding-bottom: 2px;
+    }
+
+        .toolbar-scroll::-webkit-scrollbar {
+            height: 0;
+        }
+
+    .tool-btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+        min-height: 38px; /* 手指好按 */
+        touch-action: manipulation;
+    }
+
+    .color-picker {
+        width: 50px;
+        height: 38px;
+        border: 2px solid #aaa;
+        border-radius: 6px;
+        flex-shrink: 0;
+        padding: 0;
+    }
+
+    .sidebar .btn {
+        min-height: 44px;
+        touch-action: manipulation;
+    }
+
+    /* ========== 右側水墨風可完全隱藏側邊欄 ========== */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 280px;
+        background: #F8F4EB;
+        border-left: 3px solid #2C2C2C;
+        color: #2C2C2C;
+        padding: 20px;
+        z-index: 1050;
+        overflow-y: auto;
+        transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: -6px 0 16px rgba(0,0,0,0.15);
+        padding-left: 58px;
+    }
+
+        .sidebar.hidden {
+            width: 0;
+            padding: 0;
+            overflow: hidden;
+            box-shadow: none;
+        }
+
+    .sidebar-header {
+        padding-bottom: 16px;
+        border-bottom: 2px solid #D2B48C;
+        margin-bottom: 18px;
+    }
+
+    .sidebar.hidden .sidebar-header,
+    .sidebar.hidden .sidebar-content > * {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    /* 毛筆風格 Toggle 按鈕 */
+    .toggle-btn {
+        position: absolute;
+        top: 28px;
+        right: 12px; /* 固定在右側邊緣 */
+        width: 48px;
+        height: 48px;
+        background: #F8F4EB;
+        border: 3px solid #2C2C2C;
+        border-radius: 50%;
+        color: #2C2C2C;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1.55rem;
+        font-weight: bold;
+        font-family: "KaiTi", "楷體", serif;
+        z-index: 1001;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transition: all 0.3s ease;
+    }
+
+        .toggle-btn:hover {
+            background: #EDE4D8;
+            transform: scale(1.08) rotate(8deg);
+        }
+
+        /* 箭頭切換 */
+        .toggle-btn::after {
+            content: '◀';
+            font-size: 1.4rem;
+        }
+
+    .sidebar:not(.hidden) .toggle-btn::after {
+        content: '▶';
+    }
+
+    /* 水墨按鈕樣式 */
+    .sidebar .btn-light {
+        background: rgba(255,255,255,0.7);
+        color: #2C2C2C;
+        border: 1px solid #A8A8A8;
+    }
+
+        .sidebar .btn-light:hover {
+            background: #EDE4D8;
+            border-color: #2C2C2C;
+        }
+
+    .sidebar .btn-success {
+        background: #2C2C2C;
+        color: #F8F4EB;
+    }
+
+    .form-range {
+        accent-color: #2C2C2C;
+    }
+
+    /* 畫布邊距自動調整 */
+
+    #canvas-container {
+        flex: 1 1 auto;
+        min-height: 360px; /* 關鍵：避免高度為 0 */
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #EDE4D8;
+        overflow: hidden;
+        position: relative;
+    }
+
+    #canvas {
+    display: block;
+    background: white;
+    border: 1px solid #C9BFB2;
+    border-radius: 6px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    touch-action: none; /* 避免瀏覽器手勢干擾繪圖 */
+}
+
+    .drawing-page {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 140px); /* 約略扣除 navbar + footer */
+        min-height: 480px;
+    }
+
+        .drawing-page > .row {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+    @@media (max-width: 575.98px) {
+        .drawing-page {
+            height: calc(100vh - 110px);
+            min-height: 360px;
+        }
+
+        .sidebar {
+            width: min(85vw, 280px);
+        }
+
+        .color-label {
+            font-size: 0.8rem;
+        }
+    }
+</style>
+
+<script>
+    // ==================== 物件類別 ====================
+    class CanvasObject {
+        constructor(x, y, width, height) {
+            this.x = x; this.y = y;
+            this.width = Math.max(1, width);
+            this.height = Math.max(1, height);
+            this.strokeColor = "#000000";
+            this.fillColor = "#ffffff";
+            this.strokeWidth = 5;
+            this.selected = false;
+            this.isFilled = true;
+        }
+        draw(ctx) { throw new Error("Abstract"); }
+        contains(p) {
+            return p.x >= this.x && p.x <= this.x + this.width &&
+                   p.y >= this.y && p.y <= this.y + this.height;
+        }
+        move(dx, dy) { this.x += dx; this.y += dy; }
+        resize(dx, dy, dir) {
+            switch(dir){
+                case 1: this.x+=dx; this.y+=dy; this.width-=dx; this.height-=dy; break;
+                case 2: this.y+=dy; this.height-=dy; break;
+                case 3: this.width+=dx; this.y+=dy; this.height-=dy; break;
+                case 4: this.x+=dx; this.width-=dx; break;
+                case 5: this.width+=dx; break;
+                case 6: this.x+=dx; this.width-=dx; this.height+=dy; break;
+                case 7: this.height+=dy; break;
+                case 8: this.width+=dx; this.height+=dy; break;
+            }
+            if(this.width<10) this.width=10;
+            if(this.height<10) this.height=10;
+        }
+    }
+
+    class LineObject extends CanvasObject {
+        constructor(x,y,strokeColor,strokeWidth,fillColor){ super(x,y,100,100); this.strokeColor=strokeColor; this.strokeWidth=strokeWidth; this.fillColor=fillColor; this.isFilled=false; }
+        draw(ctx){ ctx.strokeStyle=this.strokeColor; ctx.lineWidth=this.strokeWidth; ctx.beginPath(); ctx.moveTo(this.x,this.y); ctx.lineTo(this.x+this.width,this.y+this.height); ctx.stroke(); }
+    }
+    class RectObject extends CanvasObject {
+        constructor(x,y,strokeColor,strokeWidth,fillColor){ super(x,y,120,80); this.strokeColor=strokeColor; this.strokeWidth=strokeWidth; this.fillColor=fillColor; this.isFilled=true; }
+        draw(ctx){
+            if(this.isFilled){ ctx.fillStyle=this.fillColor; ctx.fillRect(this.x,this.y,this.width,this.height); }
+            ctx.strokeStyle=this.strokeColor; ctx.lineWidth=this.strokeWidth; ctx.strokeRect(this.x,this.y,this.width,this.height);
+        }
+    }
+    class CircleObject extends CanvasObject {
+        constructor(x,y,strokeColor,strokeWidth,fillColor){ super(x,y,100,100); this.strokeColor=strokeColor; this.strokeWidth=strokeWidth; this.fillColor=fillColor; this.isFilled=true; }
+        draw(ctx){
+            const cx=this.x+this.width/2, cy=this.y+this.height/2;
+            ctx.beginPath(); ctx.ellipse(cx,cy,this.width/2,this.height/2,0,0,Math.PI*2);
+            if(this.isFilled){ ctx.fillStyle=this.fillColor; ctx.fill(); }
+            ctx.strokeStyle=this.strokeColor; ctx.lineWidth=this.strokeWidth; ctx.stroke();
+        }
+    }
+    class TriangleObject extends CanvasObject {
+        constructor(x,y,strokeColor,strokeWidth,fillColor){ super(x,y,120,100); this.strokeColor=strokeColor; this.strokeWidth=strokeWidth; this.fillColor=fillColor; this.isFilled=true; }
+        draw(ctx){
+            ctx.beginPath();
+            ctx.moveTo(this.x+this.width/2,this.y);
+            ctx.lineTo(this.x,this.y+this.height);
+            ctx.lineTo(this.x+this.width,this.y+this.height);
+            ctx.closePath();
+            if(this.isFilled){ ctx.fillStyle=this.fillColor; ctx.fill(); }
+            ctx.strokeStyle=this.strokeColor; ctx.lineWidth=this.strokeWidth; ctx.stroke();
+        }
+    }
+    class StarObject extends CanvasObject {
+        constructor(x,y,strokeColor,strokeWidth,fillColor){ super(x,y,100,100); this.strokeColor=strokeColor; this.strokeWidth=strokeWidth; this.fillColor=fillColor; this.isFilled=true; }
+        draw(ctx){
+            const r = Math.min(this.width,this.height)/2;
+            ctx.beginPath();
+            for(let i=0;i<10;i++){
+                const ang = Math.PI/5*i - Math.PI/2;
+                const rad = (i%2===0)?r:r/2;
+                const px = this.x + this.width/2 + Math.cos(ang)*rad;
+                const py = this.y + this.height/2 + Math.sin(ang)*rad;
+                i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+            }
+            ctx.closePath();
+            if(this.isFilled){ ctx.fillStyle=this.fillColor; ctx.fill(); }
+            ctx.strokeStyle=this.strokeColor; ctx.lineWidth=this.strokeWidth; ctx.stroke();
+        }
+    }
+    class ArrowObject extends CanvasObject {
+        constructor(x,y,strokeColor,strokeWidth,fillColor){ super(x,y,120,60); this.strokeColor=strokeColor; this.strokeWidth=strokeWidth; this.fillColor=fillColor; }
+        draw(ctx){
+            ctx.strokeStyle=this.strokeColor; ctx.lineWidth=this.strokeWidth;
+            ctx.beginPath(); ctx.moveTo(this.x,this.y+this.height/2); ctx.lineTo(this.x+this.width-20,this.y+this.height/2); ctx.stroke();
+            ctx.fillStyle=this.fillColor; ctx.beginPath();
+            ctx.moveTo(this.x+this.width,this.y+this.height/2);
+            ctx.lineTo(this.x+this.width-20,this.y);
+            ctx.lineTo(this.x+this.width-20,this.y+this.height);
+            ctx.closePath(); ctx.fill();
+        }
+    }
+    class TextObject extends CanvasObject {
+        constructor(text,x,y,strokeColor,fillColor){ super(x,y,200,50); this.text=text; this.strokeColor=strokeColor; this.fillColor=fillColor; }
+        draw(ctx){
+            ctx.fillStyle=this.fillColor; ctx.fillRect(this.x,this.y,this.width,this.height);
+            ctx.strokeStyle=this.strokeColor; ctx.lineWidth=5; ctx.strokeRect(this.x,this.y,this.width,this.height);
+            ctx.fillStyle="#000000"; ctx.font="40px sans-serif"; ctx.fillText(this.text,this.x+20,this.y+45);
+        }
+    }
+
+    class PathObject extends CanvasObject {
+        constructor(sx, sy, color, thick, isEraser = false) {
+            super(sx, sy, 0, 0);
+            this.points = [{x: sx, y: sy}];
+            this.color = color;
+            this.thickness = thick;
+            this.isEraser = isEraser;
+        }
+        addPoint(x, y) { this.points.push({x, y}); this.updateBounds(); }
+        updateBounds() {
+            if (this.points.length < 2) { this.width = this.height = 1; return; }
+            let minX = this.points[0].x, minY = this.points[0].y;
+            let maxX = minX, maxY = minY;
+            this.points.forEach(p => {
+                minX = Math.min(minX, p.x);
+                minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x);
+                maxY = Math.max(maxY, p.y);
+            });
+            this.x = minX; this.y = minY;
+            this.width = maxX - minX || 1;
+            this.height = maxY - minY || 1;
+        }
+        move(dx, dy) {
+            this.x += dx; this.y += dy;
+            this.points.forEach(p => { p.x += dx; p.y += dy; });
+        }
+        draw(ctx) {
+            if (this.points.length < 2) return;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = this.thickness;
+            ctx.lineJoin = "round"; ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(this.points[0].x, this.points[0].y);
+            for (let i = 1; i < this.points.length; i++) {
+                ctx.lineTo(this.points[i].x, this.points[i].y);
+            }
+            ctx.stroke();
+        }
+    }
+
+    class EmotionTag extends CanvasObject {
+        constructor(text, x=100, y=100){ super(x, y, 80, 80); this.text = text; }
+        draw(ctx){ ctx.font = "80px sans-serif"; ctx.fillStyle = "#000000"; ctx.fillText(this.text, this.x, this.y + 65); }
+        contains(p){ return p.x >= this.x && p.x <= this.x + 80 && p.y >= this.y && p.y <= this.y + 80; }
+    }
+
+    // ==================== 核心變數 ====================
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let objects = [];
+    let creatingObject = null;
+    let selectedObject = null;
+    let currentMode = "選擇";
+    let currentColor = "#000000";
+    let currentFillColor = "#FFFFC8";
+    let strokeW = 5;
+    let fillEnabled = true;
+    let dragged = null, dragOX = 0, dragOY = 0;
+    let undoStack = [], redoStack = [];
+    let backgroundImg = null;
+    let startX, startY;
+    let eraserPoints = [];
+    let resizeDir = 0;
+    const HANDLE = 8;
+
+    const MAX_SNAPSHOTS = 50;
+
+    // ==================== 顏色即時套用 ====================
+    function applyStrokeColor(color) {
+        currentColor = color;
+        if (selectedObject) {
+            if (selectedObject instanceof PathObject) selectedObject.color = color;
+            else selectedObject.strokeColor = color;
+            drawAll();
+            pushSnapshot();
+        }
+    }
+
+    function applyFillColor(color) {
+        currentFillColor = color;
+        if (selectedObject && !(selectedObject instanceof PathObject)) {
+            selectedObject.fillColor = color;
+            drawAll();
+            pushSnapshot();
+        }
+    }
+
+    function drawAll() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        objects.forEach(obj => {
+            obj.draw(ctx);
+            if (obj.selected) {
+                // 藍色選取框
+                ctx.strokeStyle = "#3B82F6";
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.strokeRect(obj.x - 2, obj.y - 2, obj.width + 4, obj.height + 4);
+                ctx.setLineDash([]);
+
+                // 八個縮放控制點
+                const hs = getHandles(obj);
+                ctx.fillStyle = "#FFFFFF";
+                ctx.strokeStyle = "#3B82F6";
+                ctx.lineWidth = 2;
+                hs.forEach(h => {
+                    ctx.fillRect(h.x - HANDLE / 2, h.y - HANDLE / 2, HANDLE, HANDLE);
+                    ctx.strokeRect(h.x - HANDLE / 2, h.y - HANDLE / 2, HANDLE, HANDLE);
+                });
+            }
+        });
+
+        if (creatingObject) creatingObject.draw(ctx);
+    }
+
+    function hitHandle(obj, pos) {
+        const hs = getHandles(obj);
+        for (const h of hs) {
+            if (Math.abs(pos.x - h.x) <= HANDLE && Math.abs(pos.y - h.y) <= HANDLE)
+                return h.dir;
+        }
+        return 0;
+    }
+
+    function getHandles(obj) {
+        const x = obj.x, y = obj.y, w = obj.width, h = obj.height;
+        return [
+            { dir: 1, x: x,       y: y },
+            { dir: 2, x: x + w/2, y: y },
+            { dir: 3, x: x + w,   y: y },
+            { dir: 4, x: x,       y: y + h/2 },
+            { dir: 5, x: x + w,   y: y + h/2 },
+            { dir: 6, x: x,       y: y + h },
+            { dir: 7, x: x + w/2, y: y + h },
+            { dir: 8, x: x + w,   y: y + h }
+        ];
+    }
+
+    function addObject(obj) {
+        if (!obj) return;
+        objects.push(obj);
+        drawAll();
+        pushSnapshot();
+    }
+
+    function commitObject() {
+        if (creatingObject && currentMode !== "橡皮擦") {
+            objects.push(creatingObject);
+            creatingObject = null;
+            drawAll();
+            pushSnapshot();
+        }
+    }
+
+    // 橡皮擦切割功能
+    function erasePathSegment(pathObj, eraserPoints) {
+        if (!(pathObj instanceof PathObject) || pathObj.isEraser || pathObj.points.length < 2) return [pathObj];
+        const newPaths = [];
+        let currentSegment = [];
+        for (let i = 0; i < pathObj.points.length; i++) {
+            const p = pathObj.points[i];
+            let isHit = false;
+            for (let j = Math.max(0, eraserPoints.length - 20); j < eraserPoints.length; j++) {
+                const ep = eraserPoints[j];
+                if (Math.hypot(ep.x - p.x, ep.y - p.y) < strokeW / 2 + 6) {
+                    isHit = true;
+                    break;
+                }
+            }
+            if (!isHit) {
+                currentSegment.push({x: p.x, y: p.y});
+            } else if (currentSegment.length >= 2) {
+                const newPath = new PathObject(currentSegment[0].x, currentSegment[0].y, pathObj.color, pathObj.thickness, false);
+                for (let k = 1; k < currentSegment.length; k++) newPath.addPoint(currentSegment[k].x, currentSegment[k].y);
+                newPaths.push(newPath);
+                currentSegment = [];
+            } else {
+                currentSegment = [];
+            }
+        }
+        if (currentSegment.length >= 2) {
+            const newPath = new PathObject(currentSegment[0].x, currentSegment[0].y, pathObj.color, pathObj.thickness, false);
+            for (let k = 1; k < currentSegment.length; k++) newPath.addPoint(currentSegment[k].x, currentSegment[k].y);
+            newPaths.push(newPath);
+        }
+        return newPaths.length > 0 ? newPaths : [];
+    }
+
+    function erasePaths() {
+        if (eraserPoints.length < 2) { eraserPoints = []; return; }
+        const newObjects = [];
+        let anyChange = false;
+        for (let obj of objects) {
+            if (obj instanceof PathObject && !obj.isEraser) {
+                const fragments = erasePathSegment(obj, eraserPoints);
+                if (fragments.length !== 1 || fragments[0] !== obj) anyChange = true;
+                newObjects.push(...fragments);
+            } else {
+                newObjects.push(obj);
+            }
+        }
+        if (anyChange) {
+            objects = newObjects;
+            drawAll();
+            pushSnapshot();
+        }
+        eraserPoints = [];
+    }
+
+    function pushSnapshot() {
+        const snapshot = JSON.parse(JSON.stringify(objects));
+        undoStack.push(snapshot);
+        if (undoStack.length > MAX_SNAPSHOTS) undoStack.shift();
+        redoStack = [];
+    }
+
+    function undo() {
+        if (undoStack.length > 1) {
+            redoStack.push(undoStack.pop());
+            objects = JSON.parse(JSON.stringify(undoStack[undoStack.length - 1]));
+            drawAll();
+        }
+    }
+
+    function redo() {
+        if (redoStack.length > 0) {
+            undoStack.push(redoStack.pop());
+            objects = JSON.parse(JSON.stringify(undoStack[undoStack.length - 1]));
+            drawAll();
+        }
+    }
+
+    function clearAll() {
+        if (!confirm("確定要清空畫布嗎？")) return;
+        objects = [];
+        backgroundImg = null;
+        creatingObject = null;
+        selectedObject = null;
+        document.getElementById("txtText").value = "";
+        undoStack = [];
+        redoStack = [];
+        pushSnapshot();
+        drawAll();
+    }
+
+    function selectMode(mode) {
+        currentMode = mode;
+        canvas.style.cursor = (mode === "選擇") ? "default" : "crosshair";
+        if (creatingObject) commitObject();
+    }
+
+    function setStrokeWidth(w) { strokeW = parseInt(w); }
+    function setFillEnabled(v) { fillEnabled = v; }
+
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+    }
+
+    // 滑鼠事件
+        canvas.addEventListener("mousedown", e => {
+        e.preventDefault();
+        handlePointerDown(getPos(e));
+    });
+
+        canvas.addEventListener("mousemove", e => {
+        handlePointerMove(getPos(e), e.buttons === 1);
+    });
+
+    canvas.addEventListener("mouseup", () => handlePointerUp());
+    canvas.addEventListener("mouseleave", () => {
+        if (dragged || resizeDir || creatingObject) handlePointerUp();
+    });
+
+    // 手指觸控
+    canvas.addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 0) return;
+        handlePointerDown(getTouchPos(e.touches[0]));
+    }, { passive: false });
+
+    canvas.addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 0) return;
+        handlePointerMove(getTouchPos(e.touches[0]), true);
+    }, { passive: false });
+
+    canvas.addEventListener("touchend", e => {
+        e.preventDefault();
+        handlePointerUp();
+    }, { passive: false });
+
+    canvas.addEventListener("touchcancel", e => {
+        e.preventDefault();
+        handlePointerUp();
+    }, { passive: false });
+
+    function getTouchPos(touch) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return {
+            x: (touch.clientX - rect.left) * scaleX,
+            y: (touch.clientY - rect.top) * scaleY
+        };
+    }
+
+    function handlePointerDown(pos) {
+        startX = pos.x;
+        startY = pos.y;
+
+        if (currentMode === "選擇") {
+            if (selectedObject) {
+                const dir = hitHandle(selectedObject, pos);
+                if (dir > 0) {
+                    resizeDir = dir;
+                    dragged = null;
+                    drawAll();
+                    return;
+                }
+            }
+            let clicked = null;
+            for (let i = objects.length - 1; i >= 0; i--) {
+                if (objects[i].contains(pos)) {
+                    clicked = objects[i];
+                    break;
+                }
+            }
+            objects.forEach(o => o.selected = false);
+            selectedObject = null;
+            resizeDir = 0;
+            if (clicked) {
+                clicked.selected = true;
+                selectedObject = clicked;
+                dragged = clicked;
+                dragOX = pos.x - clicked.x;
+                dragOY = pos.y - clicked.y;
+                if (clicked instanceof TextObject || clicked instanceof EmotionTag) {
+                    document.getElementById("txtText").value = clicked.text || "";
+                }
+            }
+            drawAll();
+            return;
+        }
+
+        creatingObject = null;
+        if (currentMode === "筆刷") {
+            creatingObject = new PathObject(pos.x, pos.y, currentColor, strokeW, false);
+        } else if (currentMode === "橡皮擦") {
+            eraserPoints = [{ x: pos.x, y: pos.y }];
+        } else if (currentMode === "文字") {
+            const txt = prompt("輸入文字：", "文字");
+            if (txt) addObject(new TextObject(txt, pos.x, pos.y, currentColor, currentFillColor));
+        } else {
+            let newObj = null;
+            switch (currentMode) {
+                case "直線": newObj = new LineObject(pos.x, pos.y, currentColor, strokeW, currentFillColor); break;
+                case "矩形": newObj = new RectObject(pos.x, pos.y, currentColor, strokeW, currentFillColor); break;
+                case "圓形": newObj = new CircleObject(pos.x, pos.y, currentColor, strokeW, currentFillColor); break;
+                case "三角形": newObj = new TriangleObject(pos.x, pos.y, currentColor, strokeW, currentFillColor); break;
+                case "星形": newObj = new StarObject(pos.x, pos.y, currentColor, strokeW, currentFillColor); break;
+                case "箭頭": newObj = new ArrowObject(pos.x, pos.y, currentColor, strokeW, currentFillColor); break;
+            }
+            if (newObj) {
+                newObj.isFilled = fillEnabled;
+                creatingObject = newObj;
+            }
+        }
+        drawAll();
+    }
+
+    function handlePointerMove(pos, isDown) {
+        if (resizeDir > 0 && selectedObject) {
+            const dx = pos.x - startX;
+            const dy = pos.y - startY;
+            selectedObject.resize(dx, dy, resizeDir);
+            startX = pos.x;
+            startY = pos.y;
+            drawAll();
+            return;
+        }
+        if (dragged) {
+            const nx = pos.x - dragOX;
+            const ny = pos.y - dragOY;
+            dragged.move(nx - dragged.x, ny - dragged.y);
+            drawAll();
+            return;
+        }
+        if (!isDown) return;
+
+        if (currentMode === "橡皮擦") {
+            eraserPoints.push({ x: pos.x, y: pos.y });
+        } else if (creatingObject) {
+            if (creatingObject instanceof PathObject) {
+                creatingObject.addPoint(pos.x, pos.y);
+            } else {
+                creatingObject.width = Math.max(10, Math.abs(pos.x - startX));
+                creatingObject.height = Math.max(10, Math.abs(pos.y - startY));
+                creatingObject.x = Math.min(startX, pos.x);
+                creatingObject.y = Math.min(startY, pos.y);
+            }
+            drawAll();
+        }
+    }
+
+    function handlePointerUp() {
+        if (dragged || resizeDir > 0) {
+            pushSnapshot();
+        }
+        dragged = null;
+        resizeDir = 0;
+
+        if (currentMode === "橡皮擦") {
+            erasePaths();
+        } else if (creatingObject) {
+            commitObject();
+        }
+        drawAll();
+    }
+
+    // 情緒標籤
+    const defaultEmojis = ["😊","😢","😡","😌","😨","😍","😴","😂","🥰","😭","😤","🤔","🫶"];
+    function createEmojiButtons(){
+        const grid = document.getElementById("emojiGrid");
+        grid.innerHTML = "";
+        defaultEmojis.forEach(emo => {
+            const btn = document.createElement("button");
+            btn.className = "btn btn-light fs-1 p-2";
+            btn.textContent = emo;
+            btn.onclick = () => addObject(new EmotionTag(emo, 100 + Math.random()*400, 100 + Math.random()*200));
+            grid.appendChild(btn);
+        });
+    }
+    function addCustomEmoji(){
+        const txt = prompt("請輸入表情符號或文字：");
+        if (txt && txt.trim()) {
+            defaultEmojis.push(txt.trim());
+            createEmojiButtons();
+        }
+    }
+    function updateText(val){
+        if (!selectedObject) return;
+        if (selectedObject instanceof TextObject || selectedObject instanceof EmotionTag) {
+            selectedObject.text = val;
+            drawAll();
+        }
+    }
+
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const canvasContainer = document.getElementById('canvas-container');
+
+        sidebar.classList.toggle('hidden');
+        canvasContainer.classList.toggle('sidebar-hidden');
+
+        // 強制重繪畫布
+        setTimeout(resizeCanvas, 480);
+    }
+
+    function saveAsPNG() {
+        const link = document.createElement("a");
+        link.download = "方泊鏡海_" + new Date().toISOString().slice(0,10) + ".png";
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+    }
+
+    // Canvas 自動調整大小
+    function resizeCanvas() {
+        const container = document.getElementById('canvas-container');
+        const canvasEl = document.getElementById('canvas');
+        if (!container || !canvasEl) return;
+
+        // 若容器高度仍為 0，強制給最小高度
+        let w = container.clientWidth;
+        let h = container.clientHeight;
+
+        if (h < 100) {
+            h = Math.max(360, window.innerHeight - 200);
+            container.style.height = h + 'px';
+        }
+        if (w < 100) {
+            w = Math.max(300, window.innerWidth - 10);
+        }
+
+        canvasEl.width = Math.floor(w);
+        canvasEl.height = Math.floor(h);
+        canvasEl.style.width = w + 'px';
+        canvasEl.style.height = h + 'px';
+
+        drawAll();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    // 初始化
+    function initDrawing() {
+        createEmojiButtons();
+        selectMode("選擇");
+        document.getElementById("strokeColorPicker").value = currentColor;
+        document.getElementById("fillColorPicker").value = currentFillColor;
+
+        document.getElementById('sidebar').classList.add('hidden');
+        document.getElementById('canvas-container').classList.add('sidebar-hidden');
+
+        resizeCanvas();
+        drawAll();
+        pushSnapshot();
+
+        // 再補一次，避免 layout 尚未算完
+        setTimeout(resizeCanvas, 100);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDrawing);
+    } else {
+        initDrawing();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+</script>

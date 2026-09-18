@@ -1,0 +1,60 @@
+﻿@model MirrorSea.Models.ErrorReport
+@{
+    ViewData["Title"] = "問題回報";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0" style="background-color:#F9F5F0;">
+                <div class="card-body p-4 p-md-5">
+                    <div class="text-center mb-4">
+                        <h2 class="fw-bold" style="color:#1E1E1E;">問題回報 / 建議</h2>
+                        <p class="text-muted small">方泊 · 幫助我們做得更好</p>
+                    </div>
+
+                    @if (TempData["Success"] != null)
+                    {
+                        <div class="alert alert-success">@TempData["Success"]</div>
+                    }
+
+                    <form asp-action="ReportError" method="post">
+                        @Html.AntiForgeryToken()
+
+                        <div class="mb-3">
+                            <label class="form-label">問題標題</label>
+                            <input asp-for="Title" class="form-control" required placeholder="簡短描述問題" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">分類</label>
+                            <select asp-for="Category" class="form-select">
+                                <option value="功能異常">功能異常</option>
+                                <option value="操作問題">操作問題</option>
+                                <option value="建議">建議</option>
+                                <option value="其他">其他</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">詳細描述</label>
+                            <textarea asp-for="Content" class="form-control" rows="6" required
+                                      placeholder="請描述發生的問題、操作步驟或建議內容..."></textarea>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-lg text-white"
+                                    style="background-color:#8C6E5A; border:none;">
+                                送出回報
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="text-center mt-4">
+                        <a asp-controller="Home" asp-action="Index" class="text-muted small">← 返回首頁</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,60 @@
+﻿@model List<MirrorSea.Models.TeamMember>
+@{
+    ViewData["Title"] = "諮商團隊 - 方泊 鏡海";
+}
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <h1 class="fw-bold" style="color:#1E1E1E; font-size:2rem;">諮商團隊</h1>
+        <p class="text-muted" style="font-size:1rem;">以專業與真心，陪伴每一段旅程</p>
+    </div>
+    <div class="row g-4">
+        @foreach (var m in Model)
+        {
+            <div class="col-md-6 col-lg-4">
+                <a asp-action="TeamDetail" asp-route-slug="@m.Slug" class="text-decoration-none">
+                    <div class="card h-100 shadow-sm border-0" style="background-color:#F9F5F0;">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center">
+                                @if (!string.IsNullOrEmpty(m.PhotoUrl))
+                                {
+                                    <img src="@m.PhotoUrl"
+                                         alt="@m.Name"
+                                         class="rounded-circle me-3"
+                                         style="width:70px;height:70px;object-fit:cover;flex-shrink:0;border:2px solid #B7ADA0;" />
+                                }
+                                else
+                                {
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                                         style="width:70px;height:70px;background:#B7ADA0;color:white;font-size:1.2rem;flex-shrink:0;">
+                                        @m.Initial
+                                    </div>
+                                }
+                                <div>
+                                    <h5 class="mb-0 fw-bold" style="color:#1E1E1E;">@m.Name</h5>
+                                    <p class="mb-1 text-muted small">@m.Title</p>
+
+                                    @if (m.IsFangboCounselor)
+                                    {
+                                        <span class="badge rounded-pill" style="background-color:#8C6E5A; color:white; font-size:0.7rem;">
+                                            方泊諮商所 諮商心理師
+                                        </span>
+                                    }
+
+                                    @if (m.IsFangboClinical)
+                                    {
+                                        <span class="badge rounded-pill" style="background-color:#5A6E8C;color:white; font-size:0.8rem;">
+                                            方泊諮商所 臨床心理師
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="mt-3 text-end">
+                                <span class="small" style="color:#8C6E5A;">查看詳細介紹 →</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+</div>

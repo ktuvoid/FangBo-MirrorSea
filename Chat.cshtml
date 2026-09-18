@@ -1,0 +1,140 @@
+﻿@model List<MirrorSea.Models.ApplicationUser>
+@{
+    ViewData["Title"] = "吐槽空間";
+}
+
+<div class="container-fluid py-3">
+    <div class="row">
+        <!-- 左側：聊天對象列表 -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header" style="background:#B7ADA0;">
+                    聊天對象
+                </div>
+                <div class="list-group list-group-flush" id="userList" style="max-height:70vh; overflow-y:auto;">
+                    @foreach (var user in Model)
+                    {
+                        <button type="button" class="list-group-item list-group-item-action user-item"
+                                data-userid="@user.Id" data-username="@user.DisplayName">
+                            @user.DisplayName
+                            <small class="text-muted d-block">@user.RoleType</small>
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側：聊天視窗 -->
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center" style="background:#A69A8E;">
+                    <span id="chatTitle">請選擇聊天對象</span>
+                </div>
+                <div id="chatBox" class="card-body" style="height:55vh; overflow-y:auto; background:#F2E6D2;">
+                    <div class="text-center text-muted mt-5">選擇左側使用者開始聊天</div>
+                </div>
+                <div class="card-footer">
+                    <div class="input-group">
+                        <input type="text" id="messageInput" class="form-control" placeholder="輸入訊息（最多200字）..." maxlength="200" disabled>
+                        <button class="btn btn-primary" id="sendBtn" disabled>送出</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+<script>
+    let connection;
+    let currentTargetId = null;
+    let currentTargetName = null;
+    const currentUserId = "@User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value";
+
+    // 初始化 SignalR
+    async function initSignalR() {
+        connection = new signalR.HubConnectionBuilder()
+            .withUrl("/chathub")
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on("ReceiveMessage", (fromUserId, message) => {
+            appendMessage(fromUserId, message, fromUserId === currentUserId);
+        });
+
+        try {
+            await connection.start();
+            console.log("SignalR 已連線");
+        } catch (err) {
+            console.error("SignalR 連線失敗", err);
+        }
+    }
+
+    function appendMessage(fromUserId, message, isMe) {
+        const chatBox = document.getElementById("chatBox");
+        const div = document.createElement("div");
+        div.className = `mb-2 d-flex ${isMe ? "justify-content-end" : "justify-content-start"}`;
+
+        const bubble = document.createElement("div");
+        bubble.className = "p-2 rounded";
+        bubble.style.maxWidth = "70%";
+        bubble.style.background = isMe ? "#B7ADA0" : "#FFFFFF";
+        bubble.style.border = "1px solid #BDB4A6";
+        bubble.textContent = message;
+
+        div.appendChild(bubble);
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // 選擇聊天對象
+    document.querySelectorAll(".user-item").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            // 移除之前選中樣式
+            document.querySelectorAll(".user-item").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+
+            currentTargetId = btn.dataset.userid;
+            currentTargetName = btn.dataset.username;
+
+            document.getElementById("chatTitle").textContent = `與 ${currentTargetName} 的對話`;
+            document.getElementById("messageInput").disabled = false;
+            document.getElementById("sendBtn").disabled = false;
+
+            // 清空並載入歷史訊息（可從後端 API 取得）
+            const chatBox = document.getElementById("chatBox");
+            chatBox.innerHTML = `<div class="text-center text-muted">載入與 ${currentTargetName} 的對話...</div>`;
+
+            // 這裡可以呼叫後端 API 取得歷史訊息
+            // 目前先清空，之後用 SignalR 即時訊息
+            setTimeout(() => {
+                chatBox.innerHTML = "";
+            }, 300);
+        });
+    });
+
+    // 送出訊息
+    document.getElementById("sendBtn").addEventListener("click", async () => {
+        const input = document.getElementById("messageInput");
+        const msg = input.value.trim();
+        if (!msg || !currentTargetId) return;
+
+        try {
+            await connection.invoke("SendMessage", currentTargetId, msg);
+            input.value = "";
+        } catch (err) {
+            console.error("送出失敗", err);
+            alert("訊息送出失敗，請稍後再試");
+        }
+    });
+
+    // Enter 送出
+    document.getElementById("messageInput").addEventListener("keypress", e => {
+        if (e.key === "Enter") {
+            document.getElementById("sendBtn").click();
+        }
+    });
+
+    // 啟動
+    initSignalR();
+</script>
